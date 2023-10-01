@@ -1,1 +1,2 @@
-# Real-time scheduler
+### Real-time scheduler
+utilize ``` make all ```
