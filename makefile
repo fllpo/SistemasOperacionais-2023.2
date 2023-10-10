@@ -7,6 +7,8 @@ all: $(BIN)
 
 $(BIN): $(OBJS)
 	$(CC) $(CFLAGS) $(OBJS) -o $(BIN)
+	clear
+	./$(BIN)
 	
 %.o: %.c
 	$(CC) $(CFLAGS)	-c $< -o $@
