@@ -1,1 +1,2 @@
-# Real-time scheduler
+### Escalonador
+utilize ``` make all ```
