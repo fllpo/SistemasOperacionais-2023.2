@@ -2,7 +2,7 @@
 #include <string.h>
 #include <stdlib.h>
 
-#define NUM_TIPOS_JOBS 4
+#define NUM_TIPOS_JOBS 5
 #define RR_TAMANHO_QUANTUM 10
 
 enum estados
@@ -18,7 +18,8 @@ enum algoritmos
     FCFS,
     PS,
     SJF,
-    RR
+    RR,
+    NOSSO
 };
 
 typedef struct job
@@ -31,14 +32,14 @@ typedef struct job
         tempo_espera,
 
         estado,
-        burst_countdown,
+        rajada_contagem,
 
-        cpu_burst_length,
-        io_burst_length,
+        tamanho_rajada_cpu,
+        tamanho_rajada_io,
 
-        quant_countdown,
+        quantum_contagem,
 
-        reps;
+        repeticoes;
 
 } job_t;
 
@@ -49,7 +50,7 @@ typedef struct no
     struct no *proximo;
 } no_t;
 
-no_t *rtr_queue;
+no_t *fila_rtr;
 job_t **jobs;
 job_t *ativo = NULL;
 
@@ -60,20 +61,18 @@ int tempo = 1;
 int tempo_ocupado_cpu = 0;
 int tempo_espera_cpu = 0;
 
-const char *nome_alg[] = {"fcfs", "ps", "sjf", "rr"};
+const char *nome_alg[] = {"fcfs", "ps", "sjf", "rr", "nosso"};
 int alg_id = -1;
 
 void carrega_jobs(FILE *f);
 job_t *define_proximo_job();
-void run();
+void executar();
 void status();
 void relatorio();
 
 void push(no_t **head, job_t *j);
 job_t *pop(no_t **);
-int getpri(job_t *j);
-
-/*-------------------------------------------------------------*/
+int getprioridade(job_t *j);
 
 int main(int argc, char *argv[])
 {
@@ -93,53 +92,47 @@ int main(int argc, char *argv[])
 
     if (alg_id != -1)
     {
-        run();
+        executar();
         fprintf(f, "└───────────────────────────────┘");
     }
     else
     {
-        printf("\"%s\" algoritmo invalido\n", nome_alg[alg_id]);
+        printf("algoritmo invalido\n");
         return 0;
     }
 }
 
-/*-------------------------------------------------------------*/
-
-void run()
+void executar()
 {
 
-    for (;;)
+    while (1)
     {
-
         if (ativo)
         {
 
-            --ativo->burst_countdown;
-            --ativo->quant_countdown;
+            ativo->rajada_contagem--;
+            ativo->quantum_contagem--;
 
-            // if CPU burst is done, switch to IO
-            // and start running a new job.
-            if (ativo->burst_countdown == 0)
+            // se a rajada de cpu terminou, troca para io e inicia novo job
+            if (ativo->rajada_contagem == 0)
             {
                 ativo->estado = IO;
-                ativo->burst_countdown = ativo->io_burst_length;
+                ativo->rajada_contagem = ativo->tamanho_rajada_io;
                 ativo = define_proximo_job();
             }
 
-            // else if the current job's quantum is expired, put it
-            // at the end of the RTR queue and start the next one.
-            else if (ativo->quant_countdown == 0)
+            // senao se o quantum do job atual terminou, coloca no fim da fila e inicia o proximo
+            else if (ativo->quantum_contagem == 0)
             {
                 ativo->estado = RTR;
-                push(&rtr_queue, ativo);
+                push(&fila_rtr, ativo);
                 ativo = define_proximo_job();
             }
 
             tempo_ocupado_cpu++;
         }
 
-        // if no job is using the CPU, try to pop a new one from the queue.
-        // increment the idle time if there is nothing ready to run.
+        // se nenhum job usa o cpu, define o proximo job e incrementa tempo de espera
         else
         {
             if (!(ativo = define_proximo_job()))
@@ -148,7 +141,7 @@ void run()
             }
         }
 
-        // now look at the jobs that are not using the CPU.
+        // jobs que nao estao usando cpu
         for (int i = 0; i < num_jobs; i++)
         {
 
@@ -156,10 +149,10 @@ void run()
 
             if (j->estado == IO)
             {
-                // if IO burst is done, put back into RTR queue.
-                if (j->burst_countdown-- == 0)
+                // se a rajada io terminou, coloca na fila
+                if (j->rajada_contagem-- == 0)
                 {
-                    if (j->reps == 0)
+                    if (j->repeticoes == 0)
                     {
                         j->estado = TERMINADO;
                         j->tempo_fim = tempo;
@@ -168,46 +161,42 @@ void run()
                     else
                     {
                         j->estado = RTR;
-                        push(&rtr_queue, j);
+                        push(&fila_rtr, j);
                     }
                 }
             }
 
             if (j->estado == RTR)
             {
-                ++j->tempo_espera;
+                j->tempo_espera++;
             }
         }
 
         if (jobs_terminados < num_jobs)
             status();
         else
-        {
-            relatorio();
             break;
-        }
 
-        ++tempo;
+        tempo++;
     }
 
+    relatorio();
     for (int i = 0; i < num_jobs; i++)
     {
         free(jobs[i]);
     }
 
-    if (rtr_queue)
+    if (fila_rtr)
     {
-        free(rtr_queue);
+        free(fila_rtr);
     }
 }
-
-/*-------------------------------------------------------------*/
 
 job_t *define_proximo_job()
 {
 
     job_t *j = NULL;
-    if ((j = pop(&rtr_queue)))
+    if ((j = pop(&fila_rtr)))
     {
 
         j->estado = CPU;
@@ -217,52 +206,48 @@ job_t *define_proximo_job()
             j->tempo_inicio = tempo;
         }
 
-        if (j->burst_countdown <= 0)
+        if (j->rajada_contagem <= 0)
         {
-            j->burst_countdown = j->cpu_burst_length;
-            j->reps--;
+            j->rajada_contagem = j->tamanho_rajada_cpu;
+            j->repeticoes--;
         }
 
-        j->quant_countdown = (alg_id == RR ? RR_TAMANHO_QUANTUM : -1);
+        j->quantum_contagem = (alg_id == RR ? RR_TAMANHO_QUANTUM : -1);
     }
     return j;
 }
 
-/*-------------------------------------------------------------*/
-
 void push(no_t **head, job_t *j)
 {
 
-    no_t *new = malloc(sizeof(no_t));
-    new->job = j;
-    new->proximo = NULL;
-    new->prioridade = getpri(j);
+    no_t *novo = malloc(sizeof(no_t));
+    novo->job = j;
+    novo->proximo = NULL;
+    novo->prioridade = getprioridade(j);
 
     if (*head == NULL)
     {
-        *head = new;
+        *head = novo;
         return;
     }
 
-    if (new->prioridade < (*head)->prioridade)
+    if (novo->prioridade < (*head)->prioridade)
     {
-        new->proximo = *head;
-        *head = new;
+        novo->proximo = *head;
+        *head = novo;
         return;
     }
 
     no_t *atual = *head;
 
-    while (atual->proximo && new->prioridade > atual->proximo->prioridade)
+    while (atual->proximo && novo->prioridade > atual->proximo->prioridade)
     {
         atual = atual->proximo;
     }
 
-    new->proximo = atual->proximo;
-    atual->proximo = new;
+    novo->proximo = atual->proximo;
+    atual->proximo = novo;
 }
-
-/*-------------------------------------------------------------*/
 
 job_t *pop(no_t **head)
 {
@@ -281,21 +266,14 @@ job_t *pop(no_t **head)
     return j;
 }
 
-/*-------------------------------------------------------------*/
-
-int getpri(job_t *j)
+int getprioridade(job_t *j)
 {
 
     int p = -1;
 
-    if (alg_id == PS)
-    {
-        p = j->prioridade;
-    }
-
     if (alg_id == SJF)
     {
-        p = j->cpu_burst_length * j->reps;
+        p = j->tamanho_rajada_cpu * j->repeticoes;
     }
 
     if (alg_id == RR)
@@ -303,14 +281,17 @@ int getpri(job_t *j)
         p = tempo;
     }
 
+    if (alg_id == NOSSO)
+    {
+        p = (tempo * j->repeticoes);
+    }
+
     return p;
 }
 
-/*-------------------------------------------------------------*/
-
 void status()
 {
-    FILE *f = fopen("log.txt", "a+");
+    FILE *f = fopen("log.txt", "a");
     char *iostring = malloc(16 * sizeof(char));
     int c = 0;
 
@@ -346,7 +327,7 @@ void relatorio()
 
         fprintf(f, "   ID do Processo: %11d\n", jobs[i]->id);
         fprintf(f, "   Tempo de Início: %10d\n", jobs[i]->tempo_inicio);
-        fprintf(f, "   Tempo Final:   %12d\n", jobs[i]->tempo_fim);
+        fprintf(f, "   Tempo Final:   %12d\n", jobs[i]->tempo_fim - 1);
         fprintf(f, "   Tempo em Espera:  %9d\n", jobs[i]->tempo_espera);
 
         turn_time += jobs[i]->tempo_fim;
@@ -374,20 +355,19 @@ void carrega_jobs(FILE *f)
 
         job_t *j = calloc(1, sizeof(job_t));
 
-        sscanf(linha, "%d %d %d %d %d",
+        sscanf(linha, "%d %d %d %d",
                &j->id,
-               &j->cpu_burst_length,
-               &j->io_burst_length,
-               &j->reps,
-               &j->prioridade);
+               &j->tamanho_rajada_cpu,
+               &j->tamanho_rajada_io,
+               &j->repeticoes);
 
-        push(&rtr_queue, j);
-        ++num_jobs;
+        push(&fila_rtr, j);
+        num_jobs++;
     }
 
     jobs = malloc(num_jobs * sizeof(job_t));
 
-    no_t *atual = *&rtr_queue;
+    no_t *atual = *&fila_rtr;
 
     int i = 0;
     while (atual)
