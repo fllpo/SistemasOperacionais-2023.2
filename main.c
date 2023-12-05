@@ -15,8 +15,6 @@ enum estados
 
 enum algoritmos
 {
-    FCFS,
-    PS,
     SJF,
     RR,
     NOSSO
