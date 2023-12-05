@@ -283,7 +283,13 @@ int getprioridade(job_t *j)
 
     if (alg_id == NOSSO)
     {
-        p = (tempo * j->repeticoes);
+
+        if (j->tempo_espera != 0)
+        {
+            p = j->tempo_espera * j->tamanho_rajada_cpu * j->repeticoes;
+        }
+        else
+            p = j->tamanho_rajada_cpu * j->repeticoes;
     }
 
     return p;
