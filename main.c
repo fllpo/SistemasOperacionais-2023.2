@@ -15,8 +15,6 @@ enum estados
 
 enum algoritmos
 {
-    FCFS,
-    PS,
     SJF,
     RR,
     NOSSO
@@ -61,7 +59,7 @@ int tempo = 1;
 int tempo_ocupado_cpu = 0;
 int tempo_espera_cpu = 0;
 
-const char *nome_alg[] = {"fcfs", "ps", "sjf", "rr", "nosso"};
+const char *nome_alg[] = {"sjf", "rr", "nosso"};
 int alg_id = -1;
 
 void carrega_jobs(FILE *f);
