@@ -7,7 +7,7 @@
 
 enum estados
 {
-    RTR,
+    PRONTO,
     CPU,
     IO,
     TERMINADO
@@ -48,7 +48,7 @@ typedef struct no
     struct no *proximo;
 } no_t;
 
-no_t *fila_rtr;
+no_t *fila_pronto;
 job_t **jobs;
 job_t *ativo = NULL;
 
@@ -122,8 +122,8 @@ void executar()
             // senao se o quantum do job atual terminou, coloca no fim da fila e inicia o proximo
             else if (ativo->quantum_contagem == 0)
             {
-                ativo->estado = RTR;
-                push(&fila_rtr, ativo);
+                ativo->estado = PRONTO;
+                push(&fila_pronto, ativo);
                 ativo = define_proximo_job();
             }
 
@@ -158,13 +158,13 @@ void executar()
                     }
                     else
                     {
-                        j->estado = RTR;
-                        push(&fila_rtr, j);
+                        j->estado = PRONTO;
+                        push(&fila_pronto, j);
                     }
                 }
             }
 
-            if (j->estado == RTR)
+            if (j->estado == PRONTO)
             {
                 j->tempo_espera++;
             }
@@ -184,9 +184,9 @@ void executar()
         free(jobs[i]);
     }
 
-    if (fila_rtr)
+    if (fila_pronto)
     {
-        free(fila_rtr);
+        free(fila_pronto);
     }
 }
 
@@ -194,7 +194,7 @@ job_t *define_proximo_job()
 {
 
     job_t *j = NULL;
-    if ((j = pop(&fila_rtr)))
+    if ((j = pop(&fila_pronto)))
     {
 
         j->estado = CPU;
@@ -365,13 +365,13 @@ void carrega_jobs(FILE *f)
                &j->tamanho_rajada_io,
                &j->repeticoes);
 
-        push(&fila_rtr, j);
+        push(&fila_pronto, j);
         num_jobs++;
     }
 
     jobs = malloc(num_jobs * sizeof(job_t));
 
-    no_t *atual = *&fila_rtr;
+    no_t *atual = *&fila_pronto;
 
     int i = 0;
     while (atual)
