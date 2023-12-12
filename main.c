@@ -2,7 +2,7 @@
 #include <string.h>
 #include <stdlib.h>
 
-#define NUM_TIPOS_JOBS 5
+#define NUM_TIPOS_JOBS 3
 #define RR_TAMANHO_QUANTUM 10
 
 enum estados
